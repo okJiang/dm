@@ -174,28 +174,6 @@ func (s *Syncer) splitAndFilterDDL(
 	return statements, tableMap, nil
 }
 
-// routeDDL will rename tables in DDL.
-func (s *Syncer) routeDDL(p *parser.Parser, schema, sql string) (string, [][]*filter.Table, ast.StmtNode, error) {
-	stmt, err := p.ParseOneStmt(sql, "", "")
-	if err != nil {
-		return "", nil, nil, terror.Annotatef(terror.ErrSyncerUnitParseStmt.New(err.Error()), "ddl %s", sql)
-	}
-
-	sourceTables, err := parserpkg.FetchDDLTables(schema, stmt, s.SourceTableNamesFlavor)
-	if err != nil {
-		return "", nil, nil, err
-	}
-
-	targetTables := make([]*filter.Table, 0, len(sourceTables))
-	for i := range sourceTables {
-		routedTable := s.route(sourceTables[i])
-		targetTables = append(targetTables, routedTable)
-	}
-
-	ddl, err := parserpkg.RenameDDLTable(stmt, targetTables)
-	return ddl, [][]*filter.Table{sourceTables, targetTables}, stmt, err
-}
-
 // handleOnlineDDL checks if the input `sql` is came from online DDL tools.
 // If so, it will save actual DDL or return the actual DDL depending on online DDL types of `sql`.
 // If not, it returns original SQL and no table names.

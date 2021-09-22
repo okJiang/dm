@@ -1592,12 +1592,24 @@ func (s *testSyncerSuite) TestTrackDDL(c *C) {
 
 	p := parser.New()
 	for _, ca := range cases {
-		ddlSQL, filter, stmt, err := syncer.routeDDL(p, testDB, ca.sql)
+		stmt, err := p.ParseOneStmt(ca.sql, "", "")
+		c.Assert(err, IsNil)
+
+		sourceTables, err := parserpkg.FetchDDLTables(testDB, stmt, syncer.SourceTableNamesFlavor)
+		c.Assert(err, IsNil)
+
+		targetTables := make([]*filter.Table, 0, len(sourceTables))
+		for i := range sourceTables {
+			routedTable := syncer.route(sourceTables[i])
+			targetTables = append(targetTables, routedTable)
+		}
+
+		sqlDDL, err := parserpkg.RenameDDLTable(stmt, targetTables)
 		c.Assert(err, IsNil)
 
 		ca.callback()
 
-		c.Assert(syncer.trackDDL(testDB, ddlSQL, filter, stmt, ec), IsNil)
+		c.Assert(syncer.trackDDL(testDB, sqlDDL, [][]*filter.Table{sourceTables, targetTables}, stmt, ec), IsNil)
 		c.Assert(syncer.schemaTracker.Reset(), IsNil)
 		c.Assert(mock.ExpectationsWereMet(), IsNil)
 		c.Assert(checkPointMock.ExpectationsWereMet(), IsNil)

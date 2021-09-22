@@ -218,9 +218,21 @@ func (s *testSyncerSuite) TestResolveDDLSQL(c *C) {
 		c.Assert(targetSQLs[i], HasLen, len(statements))
 
 		for j, statement := range statements {
-			s, _, _, err := syncer.routeDDL(p, "test", statement)
+			stmt, err := p.ParseOneStmt(statement, "", "")
 			c.Assert(err, IsNil)
-			c.Assert(s, Equals, targetSQLs[i][j])
+
+			sourceTables, err := parserpkg.FetchDDLTables("test", stmt, syncer.SourceTableNamesFlavor)
+			c.Assert(err, IsNil)
+
+			targetTables := make([]*filter.Table, 0, len(sourceTables))
+			for i := range sourceTables {
+				routedTable := syncer.route(sourceTables[i])
+				targetTables = append(targetTables, routedTable)
+			}
+
+			sqlDDL, err := parserpkg.RenameDDLTable(stmt, targetTables)
+			c.Assert(err, IsNil)
+			c.Assert(sqlDDL, Equals, targetSQLs[i][j])
 		}
 	}
 }
